@@ -1,102 +1,151 @@
 import React, { useState } from "react";
 
 export default function App() {
+  const [apiKey, setApiKey] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [image, setImage] = useState("");
   const [ratio, setRatio] = useState("16:9");
-  const [duration, setDuration] = useState(10);
+  const [duration, setDuration] = useState(5);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [videoUrl, setVideoUrl] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleGenerate = async () => {
-    if (!prompt) {
-      alert("Isi prompt dulu!");
-      return;
-    }
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setVideoUrl("");
 
     try {
-      const res = await fetch("https://generativelanguage.googleapis.com/v1beta/veo:generateVideo?key=YOUR_API_KEY", {
+      const formData = new FormData();
+      formData.append("prompt", prompt);
+      formData.append("ratio", ratio);
+      formData.append("duration", duration);
+      if (imageFile) formData.append("image", imageFile);
+
+      const response = await fetch("https://api.google.com/veo2/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt,
-          videoConfig: {
-            aspectRatio: ratio,
-            durationSeconds: duration,
-            imageReference: image ? [image] : []
-          }
-        }),
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: formData,
       });
 
-      const data = await res.json();
-      console.log(data);
+      if (!response.ok) throw new Error("Gagal generate video");
 
-      if (data.videoUrl) {
-        setVideoUrl(data.videoUrl);
-      } else {
-        alert("Gagal generate, cek console log");
-      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      setVideoUrl(url);
     } catch (err) {
-      console.error(err);
-      alert("Error saat generate");
+      alert("Error: " + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white shadow-lg rounded-xl p-6 w-full max-w-lg">
-        <h1 className="text-2xl font-bold mb-4 text-center">Veo2 (TikTok : aloemTV)</h1>
+    <div className="max-w-xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-4">🎬 Veo2 (TikTok : aloemTV)</h1>
 
-        <textarea
-          className="w-full border rounded p-2 mb-3"
-          placeholder="Masukkan prompt video..."
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-        />
-
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* API Key */}
         <input
           type="text"
-          className="w-full border rounded p-2 mb-3"
-          placeholder="URL gambar referensi (opsional)"
-          value={image}
-          onChange={(e) => setImage(e.target.value)}
+          placeholder="Masukkan API Key"
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          required
+          className="w-full p-2 border rounded"
         />
 
-        <div className="flex gap-3 mb-3">
-          <select
-            className="flex-1 border rounded p-2"
-            value={ratio}
-            onChange={(e) => setRatio(e.target.value)}
-          >
-            <option value="16:9">16:9</option>
-            <option value="9:16">9:16</option>
-            <option value="1:1">1:1</option>
-          </select>
+        {/* Prompt */}
+        <textarea
+          placeholder="Deskripsi video..."
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          required
+          className="w-full p-2 border rounded"
+        />
 
-          <input
-            type="number"
-            className="w-24 border rounded p-2"
-            value={duration}
-            onChange={(e) => setDuration(Number(e.target.value))}
-            min={5}
-            max={60}
+        {/* Rasio */}
+        <select
+          value={ratio}
+          onChange={(e) => setRatio(e.target.value)}
+          className="w-full p-2 border rounded"
+        >
+          <option value="16:9">16:9 (Landscape)</option>
+          <option value="9:16">9:16 (Portrait)</option>
+          <option value="1:1">1:1 (Square)</option>
+        </select>
+
+        {/* Durasi */}
+        <input
+          type="number"
+          min="1"
+          max="60"
+          value={duration}
+          onChange={(e) => setDuration(e.target.value)}
+          className="w-full p-2 border rounded"
+        />
+
+        {/* Upload Gambar */}
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="w-full"
+        />
+        {imagePreview && (
+          <img
+            src={imagePreview}
+            alt="Preview"
+            className="w-full rounded shadow"
           />
-        </div>
+        )}
 
         <button
-          onClick={handleGenerate}
+          type="submit"
+          disabled={loading}
           className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
         >
-          Generate Video
+          {loading ? "⏳ Membuat Video..." : "🚀 Generate Video"}
         </button>
+      </form>
 
-        {videoUrl && (
-          <div className="mt-4">
-            <h2 className="text-lg font-semibold mb-2">Hasil:</h2>
-            <video controls className="w-full rounded">
-              <source src={videoUrl} type="video/mp4" />
-            </video>
-          </div>
-        )}
+      {/* Output Video */}
+      {videoUrl && (
+        <div className="mt-4">
+          <h2 className="text-lg font-semibold mb-2">Hasil:</h2>
+          <video controls className="w-full rounded mb-3">
+            <source src={videoUrl} type="video/mp4" />
+          </video>
+
+          <a
+            href={videoUrl}
+            download="veo2-video.mp4"
+            className="block w-full text-center bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
+          >
+            ⬇️ Download Video
+          </a>
+        </div>
+      )}
+
+      {/* Embed TikTok Ads */}
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold mb-2 text-center">🔥 Sponsored</h2>
+        <div className="w-full flex justify-center">
+          <iframe
+            src="https://www.tiktok.com/embed/7358765432109876543"
+            width="325"
+            height="580"
+            allow="autoplay; encrypted-media"
+            title="TikTok Ad"
+            className="rounded-xl shadow"
+          ></iframe>
+        </div>
       </div>
     </div>
   );
