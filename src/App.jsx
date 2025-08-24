@@ -1,99 +1,103 @@
 import React, { useState } from "react";
 
-function App() {
-  const [apiKey, setApiKey] = useState("");
+export default function App() {
   const [prompt, setPrompt] = useState("");
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [image, setImage] = useState("");
+  const [ratio, setRatio] = useState("16:9");
+  const [duration, setDuration] = useState(10);
+  const [videoUrl, setVideoUrl] = useState("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!apiKey || !prompt) {
-      alert("Isi API Key dan Prompt dulu!");
+  const handleGenerate = async () => {
+    if (!prompt) {
+      alert("Isi prompt dulu!");
       return;
     }
 
-    setLoading(true);
-    setResult(null);
-
     try {
-      const response = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: prompt }],
-              },
-            ],
-          }),
-        }
-      );
+      const res = await fetch("https://generativelanguage.googleapis.com/v1beta/veo:generateVideo?key=YOUR_API_KEY", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          videoConfig: {
+            aspectRatio: ratio,
+            durationSeconds: duration,
+            imageReference: image ? [image] : []
+          }
+        }),
+      });
 
-      const data = await response.json();
-      setResult(JSON.stringify(data, null, 2));
-    } catch (error) {
-      console.error(error);
-      setResult("Error: " + error.message);
-    } finally {
-      setLoading(false);
+      const data = await res.json();
+      console.log(data);
+
+      if (data.videoUrl) {
+        setVideoUrl(data.videoUrl);
+      } else {
+        alert("Gagal generate, cek console log");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saat generate");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-lg p-8 max-w-xl w-full">
-        <h1 className="text-2xl font-bold text-center text-blue-600 mb-6">
-          🚀 VEO Batch Demo
-        </h1>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white shadow-lg rounded-xl p-6 w-full max-w-lg">
+        <h1 className="text-2xl font-bold mb-4 text-center">Veo2 (TikTok : aloemTV)</h1>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium">API Key</label>
-            <input
-              type="password"
-              placeholder="Masukkan API Key"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="w-full mt-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-          </div>
+        <textarea
+          className="w-full border rounded p-2 mb-3"
+          placeholder="Masukkan prompt video..."
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+        />
 
-          <div>
-            <label className="block text-sm font-medium">Prompt</label>
-            <textarea
-              placeholder="Masukkan prompt..."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              className="w-full mt-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              rows="4"
-            />
-          </div>
+        <input
+          type="text"
+          className="w-full border rounded p-2 mb-3"
+          placeholder="URL gambar referensi (opsional)"
+          value={image}
+          onChange={(e) => setImage(e.target.value)}
+        />
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        <div className="flex gap-3 mb-3">
+          <select
+            className="flex-1 border rounded p-2"
+            value={ratio}
+            onChange={(e) => setRatio(e.target.value)}
           >
-            {loading ? "Loading..." : "Generate"}
-          </button>
-        </form>
+            <option value="16:9">16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="1:1">1:1</option>
+          </select>
 
-        {result && (
-          <div className="mt-6">
-            <h2 className="text-lg font-semibold">Result:</h2>
-            <pre className="bg-gray-900 text-green-400 p-4 rounded-lg mt-2 overflow-x-auto text-sm">
-              {result}
-            </pre>
+          <input
+            type="number"
+            className="w-24 border rounded p-2"
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value))}
+            min={5}
+            max={60}
+          />
+        </div>
+
+        <button
+          onClick={handleGenerate}
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+        >
+          Generate Video
+        </button>
+
+        {videoUrl && (
+          <div className="mt-4">
+            <h2 className="text-lg font-semibold mb-2">Hasil:</h2>
+            <video controls className="w-full rounded">
+              <source src={videoUrl} type="video/mp4" />
+            </video>
           </div>
         )}
       </div>
     </div>
   );
 }
-
-export default App;
