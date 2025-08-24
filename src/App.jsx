@@ -138,7 +138,7 @@ export default function App() {
         <h2 className="text-lg font-semibold mb-2 text-center">🔥 Sponsored</h2>
         <div className="w-full flex justify-center">
           <iframe
-            src="https://www.tiktok.com/embed/7358765432109876543"
+            src="https://www.tiktok.com/embed/7541778657744932152"
             width="325"
             height="580"
             allow="autoplay; encrypted-media"
