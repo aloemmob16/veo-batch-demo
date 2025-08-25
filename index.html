@@ -1,12 +1,53 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Veo2 aloemTV</title>
-  </head>
-  <body class="bg-gray-100">
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <title>Veo2 Generator</title>
+</head>
+<body>
+  <h2>🎬 Veo2 Video Generator</h2>
+  <form id="videoForm">
+    <label>Prompt: <input type="text" name="prompt" required></label><br>
+    <label>Upload Image: <input type="file" name="image" accept="image/*" required></label><br>
+    <label>Rasio: 
+      <select name="ratio">
+        <option value="16:9">16:9</option>
+        <option value="9:16">9:16</option>
+        <option value="1:1">1:1</option>
+      </select>
+    </label><br>
+    <label>Durasi (detik): <input type="number" name="duration" value="10"></label><br>
+    <button type="submit">Generate</button>
+  </form>
+
+  <div id="result"></div>
+
+  <script>
+    const form = document.getElementById("videoForm");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      const resultDiv = document.getElementById("result");
+      if (data.error) {
+        resultDiv.innerHTML = `<p style="color:red;">Error: ${data.error}</p>`;
+      } else {
+        // misalnya API kasih url video
+        const videoUrl = data.videoUrl || "dummy.mp4";
+        resultDiv.innerHTML = `
+          <video src="${videoUrl}" controls></video>
+          <br>
+          <a href="${videoUrl}" download="veo2-video.mp4">Download Video</a>
+        `;
+      }
+    });
+  </script>
+</body>
 </html>
