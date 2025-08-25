@@ -7,51 +7,54 @@ export const config = {
   },
 };
 
-export default async function handler(req, res) {
+export default async (req, res) => {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const form = formidable({ multiples: false });
+  const form = formidable();
+
   form.parse(req, async (err, fields, files) => {
     if (err) {
-      return res.status(500).json({ error: "Upload error" });
+      return res.status(500).json({ error: "Error parsing form data" });
     }
 
     try {
+      const prompt = fields.prompt;
       const ratio = fields.ratio || "16:9";
       const duration = fields.duration || "10";
-      const prompt = fields.prompt || "Generate a video with Veo2";
 
-      const fileData = fs.readFileSync(files.image.filepath);
-      const base64Image = fileData.toString("base64");
+      let imageBase64 = null;
+      if (files.image) {
+        const imgBuffer = fs.readFileSync(files.image[0].filepath);
+        imageBase64 = imgBuffer.toString("base64");
+      }
 
-      // 🚀 Panggil Vertex AI Studio API (Veo2)
+      // 🔑 Ambil API key dari Environment Vercel
+      const API_KEY = process.env.GOOGLE_API_KEY;
+
       const response = await fetch(
-        "https://us-central1-aiplatform.googleapis.com/v1/projects/YOUR_PROJECT/locations/us-central1/publishers/google/models/veo2:predict",
+        "https://generativelanguage.googleapis.com/v1beta/models/veo-2:generateVideo?key=" + API_KEY,
         {
           method: "POST",
-          headers: {
-            "Authorization": `Bearer ${process.env.GOOGLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            instances: [
-              {
-                prompt,
-                image: base64Image,
-                ratio,
-                duration,
-              },
-            ],
+            prompt: { text: prompt },
+            config: { aspect_ratio: ratio, duration: duration },
+            ...(imageBase64 && { image: imageBase64 }),
           }),
         }
       );
 
-      const result = await response.json();
-      return res.status(200).json(result);
+      const data = await response.json();
+      if (!response.ok) {
+        return res.status(500).json({ error: data });
+      }
+
+      // Ambil URL video dari response Google
+      res.status(200).json({ url: data.videoUrl || "" });
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      res.status(500).json({ error: e.message });
     }
   });
-}
+};
