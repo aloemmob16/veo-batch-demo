@@ -5,78 +5,83 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Veo2 Video Generator</title>
   <style>
-    body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; }
-    label { display: block; margin-top: 12px; }
-    button { margin-top: 20px; padding: 10px 20px; background: #4f46e5; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
-    button:disabled { background: #999; cursor: not-allowed; }
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    input, select, textarea, button { width: 100%; margin: 10px 0; padding: 10px; }
+    video { width: 100%; margin-top: 15px; border-radius: 8px; }
   </style>
 </head>
 <body>
   <h2>🎬 Veo2 Video Generator</h2>
 
-  <label>Masukkan Prompt:</label>
-  <textarea id="prompt" rows="4" style="width:100%;"></textarea>
+  <!-- input gambar -->
+  <label>Pilih Gambar Referensi:</label>
+  <input type="file" id="imageInput" accept="image/*"/>
 
-  <label>Upload Gambar Referensi:</label>
-  <input type="file" id="image" accept="image/*"/>
+  <!-- prompt -->
+  <label>Prompt:</label>
+  <textarea id="prompt" rows="3" placeholder="Deskripsikan videomu..."></textarea>
 
-  <label>Pilih Rasio Video:</label>
+  <!-- rasio -->
+  <label>Rasio:</label>
   <select id="ratio">
-    <option value="16:9">16:9</option>
-    <option value="9:16">9:16</option>
-    <option value="1:1">1:1</option>
+    <option value="16:9">16:9 (Landscape)</option>
+    <option value="9:16">9:16 (Portrait)</option>
+    <option value="1:1">1:1 (Square)</option>
   </select>
 
+  <!-- durasi -->
   <label>Durasi (detik):</label>
-  <input type="number" id="duration" value="10" min="1" max="60"/>
+  <input type="number" id="duration" value="5" min="2" max="30"/>
 
-  <button id="generateBtn" type="button">Generate Video</button>
+  <!-- tombol -->
+  <button id="generateBtn">Generate Video</button>
 
   <div id="status"></div>
-  <div id="result"></div>
+  <video id="resultVideo" controls></video>
 
   <script>
-    const btn = document.getElementById("generateBtn");
+    const generateBtn = document.getElementById("generateBtn");
     const statusDiv = document.getElementById("status");
-    const resultDiv = document.getElementById("result");
+    const resultVideo = document.getElementById("resultVideo");
 
-    btn.addEventListener("click", async () => {
+    generateBtn.onclick = async () => {
       const prompt = document.getElementById("prompt").value;
       const ratio = document.getElementById("ratio").value;
       const duration = document.getElementById("duration").value;
-      const imageFile = document.getElementById("image").files[0];
+      const imageInput = document.getElementById("imageInput").files[0];
 
-      if (!prompt) {
-        alert("Prompt harus diisi!");
+      if (!prompt || !imageInput) {
+        alert("Isi prompt dan pilih gambar!");
         return;
       }
-
-      btn.disabled = true;
-      statusDiv.innerText = "⏳ Sedang mengirim request...";
 
       const formData = new FormData();
       formData.append("prompt", prompt);
       formData.append("ratio", ratio);
       formData.append("duration", duration);
-      if (imageFile) formData.append("image", imageFile);
+      formData.append("image", imageInput);
+
+      statusDiv.innerText = "⏳ Sedang generate video...";
 
       try {
         const res = await fetch("/api/generate", {
           method: "POST",
-          body: formData,
+          body: formData
         });
 
-        if (!res.ok) throw new Error("Gagal request API");
+        if (!res.ok) {
+          throw new Error("Gagal request ke API backend");
+        }
 
-        const data = await res.json();
-        statusDiv.innerText = "✅ Video berhasil dibuat!";
-        resultDiv.innerHTML = `<a href="${data.url}" download>Download Video</a><br><video src="${data.url}" controls width="100%"></video>`;
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        resultVideo.src = url;
+        statusDiv.innerText = "✅ Video selesai!";
       } catch (err) {
+        console.error(err);
         statusDiv.innerText = "❌ Error: " + err.message;
-      } finally {
-        btn.disabled = false;
       }
-    });
+    };
   </script>
 </body>
 </html>
