@@ -1,152 +1,137 @@
 import React, { useState } from "react";
+import ReactDOM from "react-dom/client";
 
-export default function App() {
-  const [apiKey, setApiKey] = useState("");
+function App() {
   const [prompt, setPrompt] = useState("");
-  const [ratio, setRatio] = useState("16:9");
-  const [duration, setDuration] = useState(5);
   const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [ratio, setRatio] = useState("9:16");        // default TikTok/Reels
+  const [duration, setDuration] = useState(6);       // default 6 detik
   const [videoUrl, setVideoUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+    setImageFile(e.target.files?.[0] || null);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleGenerate = async () => {
     setLoading(true);
+    setErrorMsg("");
     setVideoUrl("");
 
     try {
       const formData = new FormData();
       formData.append("prompt", prompt);
       formData.append("ratio", ratio);
-      formData.append("duration", duration);
+      formData.append("duration", String(duration));
       if (imageFile) formData.append("image", imageFile);
 
-      const response = await fetch("https://api.google.com/veo2/generate", {
+      const res = await fetch("/api/veo2", {
         method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}` },
         body: formData,
       });
 
-      if (!response.ok) throw new Error("Gagal generate video");
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Gagal generate video");
+      }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setVideoUrl(url);
+      // Sesuaikan path berdasarkan response Google AI Studio kamu
+      // Di sini diasumsikan API mengembalikan { video: { uri: "https://..." } }
+      const uri =
+        data?.video?.uri ||
+        data?.result?.videoUrl ||
+        data?.output?.videoUrl ||
+        "";
+
+      if (!uri) {
+        throw new Error("Tidak menemukan URL video pada respons API.");
+      }
+
+      setVideoUrl(uri);
     } catch (err) {
-      alert("Error: " + err.message);
+      setErrorMsg(err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const disableGenerate = !prompt || loading;
+
   return (
-    <div className="max-w-xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">🎬 Veo2 (TikTok : aloemTV)</h1>
+    <div className="min-h-screen flex flex-col items-center p-6 gap-4">
+      <h1 className="text-2xl font-bold">🎬 Veo2 Video Generator</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* API Key */}
-        <input
-          type="text"
-          placeholder="Masukkan API Key"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          required
-          className="w-full p-2 border rounded"
-        />
-
-        {/* Prompt */}
+      <div className="w-full max-w-md space-y-3">
+        <label className="block text-sm font-medium">Prompt</label>
         <textarea
-          placeholder="Deskripsi video..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          required
-          className="w-full p-2 border rounded"
+          className="w-full h-28 p-2 border rounded"
+          placeholder="Deskripsikan videomu…"
         />
 
-        {/* Rasio */}
-        <select
-          value={ratio}
-          onChange={(e) => setRatio(e.target.value)}
-          className="w-full p-2 border rounded"
-        >
-          <option value="16:9">16:9 (Landscape)</option>
-          <option value="9:16">9:16 (Portrait)</option>
-          <option value="1:1">1:1 (Square)</option>
-        </select>
-
-        {/* Durasi */}
-        <input
-          type="number"
-          min="1"
-          max="60"
-          value={duration}
-          onChange={(e) => setDuration(e.target.value)}
-          className="w-full p-2 border rounded"
-        />
-
-        {/* Upload Gambar */}
+        <label className="block text-sm font-medium">Gambar Referensi (opsional)</label>
         <input
           type="file"
           accept="image/*"
           onChange={handleFileChange}
           className="w-full"
         />
-        {imagePreview && (
-          <img
-            src={imagePreview}
-            alt="Preview"
-            className="w-full rounded shadow"
-          />
-        )}
+
+        <label className="block text-sm font-medium">Rasio Video</label>
+        <select
+          value={ratio}
+          onChange={(e) => setRatio(e.target.value)}
+          className="w-full p-2 border rounded"
+        >
+          <option value="16:9">16:9 (YouTube)</option>
+          <option value="1:1">1:1 (Instagram)</option>
+          <option value="9:16">9:16 (TikTok/Reels)</option>
+        </select>
+
+        <label className="block text-sm font-medium">Durasi (detik)</label>
+        <input
+          type="number"
+          min={3}
+          max={20}
+          value={duration}
+          onChange={(e) => setDuration(Number(e.target.value))}
+          className="w-full p-2 border rounded"
+        />
 
         <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+          onClick={handleGenerate}
+          disabled={disableGenerate}
+          className="w-full py-2 rounded text-white bg-blue-600 disabled:opacity-50"
         >
-          {loading ? "⏳ Membuat Video..." : "🚀 Generate Video"}
+          {loading ? "Membuat Video…" : "Generate Video"}
         </button>
-      </form>
 
-      {/* Output Video */}
+        {errorMsg && (
+          <div className="text-red-600 text-sm">{errorMsg}</div>
+        )}
+      </div>
+
       {videoUrl && (
-        <div className="mt-4">
-          <h2 className="text-lg font-semibold mb-2">Hasil:</h2>
-          <video controls className="w-full rounded mb-3">
-            <source src={videoUrl} type="video/mp4" />
-          </video>
-
+        <div className="w-full max-w-md mt-4 space-y-3">
+          <video
+            src={videoUrl}
+            controls
+            className="w-full rounded shadow"
+          />
           <a
             href={videoUrl}
-            download="veo2-video.mp4"
-            className="block w-full text-center bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
+            download
+            className="block text-center w-full py-2 rounded bg-gray-800 text-white"
           >
-            ⬇️ Download Video
+            Download Video
           </a>
         </div>
       )}
-
-      {/* Embed TikTok Ads */}
-      <div className="mt-8">
-        <h2 className="text-lg font-semibold mb-2 text-center">🔥 Sponsored</h2>
-        <div className="w-full flex justify-center">
-          <iframe
-            src="https://www.tiktok.com/embed/7541778657744932152"
-            width="325"
-            height="580"
-            allow="autoplay; encrypted-media"
-            title="TikTok Ad"
-            className="rounded-xl shadow"
-          ></iframe>
-        </div>
-      </div>
     </div>
   );
 }
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+export default App;
