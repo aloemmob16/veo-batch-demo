@@ -1,51 +1,80 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Veo2 Generator</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Veo2 Video Generator</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; }
+    label { display: block; margin-top: 12px; }
+    button { margin-top: 20px; padding: 10px 20px; background: #4f46e5; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+    button:disabled { background: #999; cursor: not-allowed; }
+  </style>
 </head>
 <body>
   <h2>🎬 Veo2 Video Generator</h2>
-  <form id="videoForm">
-    <label>Prompt: <input type="text" name="prompt" required></label><br>
-    <label>Upload Image: <input type="file" name="image" accept="image/*" required></label><br>
-    <label>Rasio: 
-      <select name="ratio">
-        <option value="16:9">16:9</option>
-        <option value="9:16">9:16</option>
-        <option value="1:1">1:1</option>
-      </select>
-    </label><br>
-    <label>Durasi (detik): <input type="number" name="duration" value="10"></label><br>
-    <button type="submit">Generate</button>
-  </form>
 
+  <label>Masukkan Prompt:</label>
+  <textarea id="prompt" rows="4" style="width:100%;"></textarea>
+
+  <label>Upload Gambar Referensi:</label>
+  <input type="file" id="image" accept="image/*"/>
+
+  <label>Pilih Rasio Video:</label>
+  <select id="ratio">
+    <option value="16:9">16:9</option>
+    <option value="9:16">9:16</option>
+    <option value="1:1">1:1</option>
+  </select>
+
+  <label>Durasi (detik):</label>
+  <input type="number" id="duration" value="10" min="1" max="60"/>
+
+  <button id="generateBtn" type="button">Generate Video</button>
+
+  <div id="status"></div>
   <div id="result"></div>
 
   <script>
-    const form = document.getElementById("videoForm");
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const formData = new FormData(form);
+    const btn = document.getElementById("generateBtn");
+    const statusDiv = document.getElementById("status");
+    const resultDiv = document.getElementById("result");
 
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        body: formData,
-      });
+    btn.addEventListener("click", async () => {
+      const prompt = document.getElementById("prompt").value;
+      const ratio = document.getElementById("ratio").value;
+      const duration = document.getElementById("duration").value;
+      const imageFile = document.getElementById("image").files[0];
 
-      const data = await res.json();
-      const resultDiv = document.getElementById("result");
-      if (data.error) {
-        resultDiv.innerHTML = `<p style="color:red;">Error: ${data.error}</p>`;
-      } else {
-        // misalnya API kasih url video
-        const videoUrl = data.videoUrl || "dummy.mp4";
-        resultDiv.innerHTML = `
-          <video src="${videoUrl}" controls></video>
-          <br>
-          <a href="${videoUrl}" download="veo2-video.mp4">Download Video</a>
-        `;
+      if (!prompt) {
+        alert("Prompt harus diisi!");
+        return;
+      }
+
+      btn.disabled = true;
+      statusDiv.innerText = "⏳ Sedang mengirim request...";
+
+      const formData = new FormData();
+      formData.append("prompt", prompt);
+      formData.append("ratio", ratio);
+      formData.append("duration", duration);
+      if (imageFile) formData.append("image", imageFile);
+
+      try {
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) throw new Error("Gagal request API");
+
+        const data = await res.json();
+        statusDiv.innerText = "✅ Video berhasil dibuat!";
+        resultDiv.innerHTML = `<a href="${data.url}" download>Download Video</a><br><video src="${data.url}" controls width="100%"></video>`;
+      } catch (err) {
+        statusDiv.innerText = "❌ Error: " + err.message;
+      } finally {
+        btn.disabled = false;
       }
     });
   </script>
