@@ -1,11 +1,9 @@
-// api/generate.js
 import formidable from "formidable";
 import fs from "fs";
-import fetch from "node-fetch";
 
 export const config = {
   api: {
-    bodyParser: false, // biar bisa baca FormData
+    bodyParser: false, // pakai formidable untuk form-data
   },
 };
 
@@ -14,69 +12,54 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  try {
-    const form = formidable({});
-    const [fields, files] = await form.parse(req);
+  const form = formidable({ multiples: false });
 
-    const prompt = fields.prompt?.[0] || "";
-    const ratio = fields.ratio?.[0] || "16:9";
-    const duration = parseInt(fields.duration?.[0] || "5", 10);
-    const imageFile = files.image?.[0];
+  form.parse(req, async (err, fields, files) => {
+    if (err) return res.status(500).json({ error: "Form parse error" });
 
-    if (!prompt || !imageFile) {
-      return res.status(400).json({ error: "Prompt dan gambar wajib diisi" });
-    }
+    try {
+      const prompt = fields.prompt;
+      const duration = fields.duration || "10";
+      const ratio = fields.ratio || "16:9";
 
-    // Baca file gambar
-    const imageBuffer = fs.readFileSync(imageFile.filepath);
-
-    // Kirim ke API Google Veo2
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/veo-2:generateVideo?key=" +
-        process.env.GOOGLE_API_KEY,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt: {
-            text: prompt,
-          },
-          config: {
-            aspectRatio: ratio,
-            durationSeconds: duration,
-          },
-          // Convert image ke base64
-          images: [
-            {
-              mimeType: "image/png",
-              data: imageBuffer.toString("base64"),
-            },
-          ],
-        }),
+      // handle file upload (opsional)
+      let imageBuffer = null;
+      if (files.image) {
+        imageBuffer = fs.readFileSync(files.image.filepath);
       }
-    );
 
-    if (!response.ok) {
-      const errText = await response.text();
-      return res.status(500).json({ error: "API Error: " + errText });
+      // 🔑 pakai API key dari Vercel Env
+      const apiKey = process.env.GOOGLE_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "API Key tidak ditemukan" });
+      }
+
+      // request ke Google Vertex AI / Veo2
+      const response = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/veo-2:generateVideo?key=" + apiKey,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            duration,
+            aspect_ratio: ratio,
+            image: imageBuffer ? imageBuffer.toString("base64") : null,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const text = await response.text();
+        return res.status(response.status).json({ error: text });
+      }
+
+      // anggap API balikin video blob
+      const arrayBuffer = await response.arrayBuffer();
+      res.setHeader("Content-Type", "video/mp4");
+      res.send(Buffer.from(arrayBuffer));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
     }
-
-    const data = await response.json();
-
-    // Ambil hasil video (misalnya berupa base64 / url)
-    const videoBase64 = data.video?.data;
-    if (!videoBase64) {
-      return res.status(500).json({ error: "Video tidak ada di response" });
-    }
-
-    // Kirim balik ke browser dalam bentuk mp4
-    const videoBuffer = Buffer.from(videoBase64, "base64");
-    res.setHeader("Content-Type", "video/mp4");
-    res.send(videoBuffer);
-  } catch (err) {
-    console.error("Error generate:", err);
-    res.status(500).json({ error: "Server error: " + err.message });
-  }
+  });
 }
